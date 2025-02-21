@@ -1,0 +1,124 @@
+name: Construcción y Despliegue en Azure
+
+env:
+  AZURE_WEBAPP_NAME: app-proyecto-valverde-lizarraga
+  DOTNET_VERSION: '8'
+  IMAGE_NAME: ghcr.io/jeanvalverde24/shorten
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'GestionReservasWebII/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Escaneo de Seguridad con Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: './GestionReservasWebII'
+          severity: 'HIGH,CRITICAL'
+
+  build:
+    runs-on: ubuntu-latest
+    needs: scan
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Login en GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Construir y publicar imagen Docker
+        run: |
+          docker build -f GestionReservasWebII/Dockerfile . --tag ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+  deploy:
+    permissions:
+      contents: none
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'Development'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Login en Azure con Usuario y Contraseña
+        run: |
+          az login -u ${{ secrets.AZURE_USERNAME }} -p ${{ secrets.AZURE_PASSWORD }} --output none
+          az account set --subscription 83fff94f-ea6d-44c3-a294-e78a99bee2f9
+          echo "✅ Suscripción establecida correctamente."
+
+      - name: Verificar si el App Service existe antes de desplegar
+        run: |
+          az webapp show --resource-group arg-proyecto-valverde-lizarraga --name app-proyecto-valverde-lizarraga || exit 1
+
+      - name: Desplegar a Azure Web App con Docker
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          images: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Generar Diagrama de Despliegue (JSON)
+        run: |
+          az group export -n arg-proyecto-valverde-lizarraga --output json > diagrama_de_despliegue.json || echo "❌ Advertencia: Algunos recursos no se exportaron."
+
+      - name: Instalar jq y Graphviz
+        run: |
+          sudo apt update
+          sudo apt install jq graphviz -y
+
+      - name: Convertir JSON a formato DOT
+        run: |
+          echo "digraph G {" > deployment.dot
+          cat diagrama_de_despliegue.json | jq -r '.resources[] | "    \"" + .type + "\" -> \"" + .name + "\";"' >> deployment.dot
+          echo "}" >> deployment.dot
+          cat deployment.dot  # Mostrar el archivo DOT generado
+
+      - name: Convertir DOT a PNG
+        run: |
+          dot -Tpng deployment.dot -o deployment.png || echo "❌ Error en la generación del diagrama PNG."
+
+      - name: Subir artefactos del diagrama de despliegue
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagrama_de_despliegue
+          path: |
+            diagrama_de_despliegue.json
+            deployment.png
+
+      - name: Publicar Diagrama en Summary
+        run: |
+          echo "## 📌 Diagrama de Despliegue" >> $GITHUB_STEP_SUMMARY
+          echo '<details><summary>Ver Diagrama JSON</summary>' >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          cat diagrama_de_despliegue.json >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "![Diagrama de Despliegue](deployment.png)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Publicar URL de la Web en el Summary
+        run: |
+          echo "## 🌐 Aplicación Desplegada" >> $GITHUB_STEP_SUMMARY
+          echo "[Acceder a la Web App](https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net)" >> $GITHUB_STEP_SUMMARY

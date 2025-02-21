@@ -1,0 +1,182 @@
+﻿@{
+    ViewData["Title"] = "Inicio de Sesión";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Página de Inicio de Sesión</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to right, #ffffff, #f0f4f8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .login-container {
+            display: flex;
+            width: 800px;
+            height: 520px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            background-color: #ffffff;
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        .left-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: #003366;
+            color: #ffffff;
+        }
+
+        .right-section {
+            flex: 1;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background-color: #f9fafc;
+        }
+
+        .right-section h2 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #003366;
+            text-align: center;
+        }
+
+        .checkbox-group {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cccccc;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        .btn-submit {
+            background: #003366;
+            color: #ffffff;
+            border: none;
+            padding: 12px;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .btn-submit:hover {
+            background: #004b99;
+        }
+
+        .register-links {
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .register-links a {
+            text-decoration: none;
+            font-size: 0.9rem;
+            color: #0066cc;
+            margin: 0 10px;
+        }
+
+        .register-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+
+    <script>
+        function updateInputField() {
+            const role = document.querySelector('input[name="role"]:checked').value;
+            const usernameInput = document.getElementById("username");
+
+            if (role === "student") {
+                usernameInput.placeholder = "Código Universitario";
+                usernameInput.type = "text";
+                usernameInput.pattern = "[0-9]{10}"; // 10 dígitos numéricos
+                usernameInput.title = "Debe ingresar un código universitario de 10 dígitos numéricos";
+            } 
+            else if (role === "teacher") {
+                usernameInput.placeholder = "Correo (virtual.upt.pe)";
+                usernameInput.type = "email";
+                usernameInput.pattern = "^[a-zA-Z0-9._%+-]+@@virtual\\.upt\\.pe$"; // Dominio restringido
+                usernameInput.title = "Debe ingresar un correo con el dominio @@virtual.upt.pe";
+            } 
+            else if (role === "admin") {
+                usernameInput.placeholder = "Correo personal";
+                usernameInput.type = "email";
+                usernameInput.pattern = "^[a-zA-Z0-9._%+-]+@@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"; // Cualquier dominio válido
+                usernameInput.title = "Debe ingresar un correo válido";
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll('input[name="role"]').forEach(radio => {
+                radio.addEventListener("change", updateInputField);
+            });
+
+            updateInputField(); // Para aplicar la configuración inicial
+        });
+    </script>
+</head>
+<body>
+    <div class="login-container">
+        <div class="left-section">
+            <img src="~/images/university-logo.png" alt="Logo de la Universidad">
+            <h1>Logo de la Universidad</h1>
+        </div>
+        <div class="right-section">
+            <h2>Inicio de Sesión</h2>
+            <form asp-action="Login" asp-controller="Auth" method="post">
+                <div class="checkbox-group">
+                    <label><input type="radio" name="role" value="student" checked> Estudiante</label>
+                    <label><input type="radio" name="role" value="teacher"> Docente</label>
+                    <label><input type="radio" name="role" value="admin"> Administrador</label>
+                </div>
+                <div class="form-group">
+                    <input id="username" type="text" name="username" placeholder="Código Universitario" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" name="password" placeholder="Contraseña" required>
+                </div>
+                @if (!string.IsNullOrEmpty(ViewBag.ErrorMessage)) {
+                    <p style="color: red; text-align: center;">@ViewBag.ErrorMessage</p>
+                }
+                <button type="submit" class="btn-submit">Ingresar</button>
+            </form>
+
+            <!-- Enlaces para registrar un nuevo usuario -->
+            <div class="register-links">
+                <p>¿Aún no tienes cuenta?</p>
+                <a asp-action="RegistrarEstudiante" asp-controller="Usuario">Regístrate como Estudiante</a> |
+                <a asp-action="RegistrarDocente" asp-controller="Usuario">Regístrate como Docente</a> |
+                <a asp-action="RegistrarAdministrador" asp-controller="Usuario">Regístrate como Administrador</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
